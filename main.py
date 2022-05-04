@@ -15,6 +15,7 @@ import gensim
 import gensim.corpora as corpora
 from gensim.utils import simple_preprocess
 from gensim.models import CoherenceModel
+from nltk import TweetTokenizer
 
 # spacy for lemmatization
 import spacy
@@ -42,7 +43,7 @@ stop_words = stopwords.words('english')
 # Read in data
 
 globStr = "*"
-dirName = "/home/tommy/PycharmProjects/nlpTwitter/apr_8_hash/"
+dirName = "/home/tommy/PycharmProjects/nlpTwitter/april_29_12pm/"
 data_files = [(x[0], x[2]) for x in os.walk(dirName)]
 # print(data_files[0][1])
 tweetList = []
@@ -77,15 +78,19 @@ def sent_to_words(sentences):
 
 tst2 = tweetList[:, 1]
 
-data_words = list(sent_to_words(tweetList[:, 1]))
+tweet_tokenizer = TweetTokenizer()
+data_words = []
+for doc in tweetList[:,1]:
+    data_words.append(tweet_tokenizer.tokenize(doc))
+#data_words = list(sent_to_words(tweetList[:, 1]))
 
-# Build the bigram and trigram models
-bigram = gensim.models.Phrases(data_words, min_count=5, threshold=100)  # higher threshold fewer phrases.
-trigram = gensim.models.Phrases(bigram[data_words], threshold=100)
-
-# Faster way to get a sentence clubbed as a trigram/bigram
-bigram_mod = gensim.models.phrases.Phraser(bigram)
-trigram_mod = gensim.models.phrases.Phraser(trigram)
+# # Build the bigram and trigram models
+# bigram = gensim.models.Phrases(data_words, min_count=5, threshold=100)  # higher threshold fewer phrases.
+# trigram = gensim.models.Phrases(bigram[data_words], threshold=100)
+#
+# # Faster way to get a sentence clubbed as a trigram/bigram
+# bigram_mod = gensim.models.phrases.Phraser(bigram)
+# trigram_mod = gensim.models.phrases.Phraser(trigram)
 
 
 def remove_stopwords(texts):
@@ -112,15 +117,19 @@ def lemmatization(texts, allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV']):
 # Remove Stop Words
 data_words_nostops = remove_stopwords(data_words)
 
-# Form Bigrams
-data_words_bigrams = make_bigrams(data_words_nostops)
+# # Form Bigrams
+# data_words_bigrams = make_bigrams(data_words_nostops)
 
 # Initialize spacy 'en' model, keeping only tagger component (for efficiency)
 # python3 -m spacy download en_core_web_sm
 nlp = spacy.load('en_core_web_sm', disable=['parser', 'ner'])
 
 # Do lemmatization keeping only noun, adj, vb, adv
-data_lemmatized = lemmatization(data_words_bigrams, allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV'])
+#data_lemmatized = lemmatization(data_words_bigrams, allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV'])
+data_lemmatized = lemmatization(data_words_nostops, allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV'])
+
+tokens_back_to_text = [' '.join(map(str, l)) for l in data_lemmatized]
+
 
 # Create Dictionary
 id2word = corpora.Dictionary(data_lemmatized)
@@ -141,15 +150,20 @@ print([[(id2word[id], freq) for id, freq in cp] for cp in corpus[:1]])
 # Build LDA model
 lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
                                             id2word=id2word,
-                                            num_topics=20,
-                                            random_state=100,
-                                            update_every=1,
-                                            chunksize=100,
-                                            passes=10,
-                                            alpha='auto',
-                                            per_word_topics=True)
+                                            num_topics=15,
+                                            random_state=1,
+                                            passes=10)
 
 pprint(lda_model.print_topics())
 doc_lda = lda_model[corpus]
 
+base_perplexity = lda_model.log_perplexity(corpus)
+print('\nPerplexity: ', base_perplexity)
+
+# Compute Coherence Score
+coherence_model = CoherenceModel(model=lda_model, texts=texts,
+                                   dictionary=id2word, coherence='c_v')
+coherence_model_lda = CoherenceModel(model=lda_model, texts=data_lemmatized, dictionary=id2word, coherence='c_v')
+coherence_lda = coherence_model_lda.get_coherence()
+print('\nCoherence Score: ', coherence_lda)
 print("Done!")
