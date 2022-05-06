@@ -9,6 +9,7 @@ import pandas as pd
 import os
 import glob
 from pprint import pprint
+from emoji import UNICODE_EMOJI
 
 # Gensim
 import gensim
@@ -94,7 +95,21 @@ for doc in tweetList[:,1]:
 
 
 def remove_stopwords(texts):
-    return [[word for word in simple_preprocess(str(doc)) if word not in stop_words] for doc in texts]
+    no_stops = []
+    for doc in texts:
+        no_stop_doc = []
+        for word in doc:
+            if word not in stop_words:
+                # test = UNICODE_EMOJI['en'].keys()
+                if word in UNICODE_EMOJI['en'].keys():
+                    no_stop_doc.append(word)
+                else:
+                    processed = simple_preprocess(word)
+                    if processed:
+                        no_stop_doc.append(processed[0])
+        no_stops.append(no_stop_doc)
+    return no_stops
+    #return [[word for word in simple_preprocess(str(doc)) if word not in stop_words] for doc in texts]
 
 
 def make_bigrams(texts):
@@ -110,7 +125,14 @@ def lemmatization(texts, allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV']):
     texts_out = []
     for sent in texts:
         doc = nlp(" ".join(sent))
-        texts_out.append([token.lemma_ for token in doc if token.pos_ in allowed_postags])
+        docLemma = []
+        for token in doc:
+            if token.pos_ in allowed_postags:
+                docLemma.append(token.lemma_)
+            elif token.text in UNICODE_EMOJI['en'].keys():
+                docLemma.append(token.text)
+        texts_out.append(docLemma)
+        #texts_out.append([token.lemma_ for token in doc if token.pos_ in allowed_postags])
     return texts_out
 
 
